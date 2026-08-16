@@ -27,14 +27,14 @@ final internal class Mounter {
         if !isRPPairing {
             guard MuxerService.shared.isListening else {
                 debugLog("[minimuxer] mounter: usbmuxd not ready!")
-                throw MinimuxerError.noConnection("Usbmuxd fake server is not listening")
+                throw MinimuxerError.noConnection("Usbmuxd 模拟服务器未在监听")
             }
         }
 
         // Prerequisite: device must be reachable
         guard (try? await DeviceEndpoint.shared.ip()) != nil else {
             debugLog("[minimuxer] mounter: device IP not available")
-            throw MinimuxerError.noDevice("Reachable device IP not found")
+            throw MinimuxerError.noDevice("未找到可达的设备 IP")
         }
 
         let isDDIMounted = try await runIdevice("isDDIMounted") {
@@ -53,14 +53,14 @@ final internal class Mounter {
                 try await IdeviceGateway.shared.getLockdownValue(key: "ProductVersion")
             }) else {
                 debugLog("[minimuxer] mounter: could not get device version")
-                throw MinimuxerError.noDevice("ProductVersion not found in lockdown")
+                throw MinimuxerError.noDevice("在 lockdown 中未找到 ProductVersion")
             }
             versionStr = v
             major = Int(v.split(separator: ".").first ?? "0") ?? 0
         }
 
         let activeProtocol: PairingProtocol = isRPPairing ? .rppairing : .lockdown
-        var lastError: Error = MinimuxerError.mount(protocol: activeProtocol, reason: "Initial mount state")
+        var lastError: Error = MinimuxerError.mount(protocol: activeProtocol, reason: "初始挂载状态")
         for attempt in 1...max(1, maxRetries) {
             do {
                 try await performMount(major: major, iosVersion: versionStr, dmgDocsPath: dmgDocsPath)
@@ -77,7 +77,7 @@ final internal class Mounter {
                 case .connectionFailed(let reason)
                     where reason.lowercased().contains("broken pipe") || reason.lowercased().contains("brokenpipe"):
                     // VPN tunnel was severed — translate immediately, no retry useful
-                    throw MinimuxerError.noVPN("VPN tunnel severed during mount. Cause: \(reason)")
+                    throw MinimuxerError.noVPN("挂载期间 VPN 隧道已断开。原因：\(reason)")
                 case .connectionFailed, .noConnection:
                     lastError = error
                     verboseLog("[minimuxer] mounter: attempt \(attempt)/\(maxRetries) — connection failed, retrying...")
@@ -88,7 +88,7 @@ final internal class Mounter {
                 let errStr = "\(error)"
                 if isPairingError(error, errStr) {
                     debugLog("[minimuxer] mounter: ERROR: Invalid pairing file — device rejected handshake. Please redo pairing.")
-                    throw MinimuxerError.invalidPairing(protocol: activeProtocol, reason: "Device rejected pairing verify handshake: \(errStr). Please redo pairing.")
+                    throw MinimuxerError.invalidPairing(protocol: activeProtocol, reason: "设备拒绝了配对验证握手：\(errStr)。请重新配对。")
                 }
                 throw error
             }
@@ -162,7 +162,7 @@ final internal class Mounter {
                   let dmgUrlStr = json[iosVersion],
                   let dmgUrl = URL(string: dmgUrlStr) else {
                 debugLog("[minimuxer] ERROR: Unable to download DMG dictionary or find version")
-                throw MinimuxerError.downloadImage("Failed to retrieve pre-17 versions plist or find iOS \(iosVersion) DMG URL")
+                throw MinimuxerError.downloadImage("检索 pre-17 版本 plist 或查找 iOS \(iosVersion) DMG URL 失败")
             }
 
             let zipData = try Data(contentsOf: dmgUrl)
@@ -196,7 +196,7 @@ final internal class Mounter {
         guard let dmgData = try? Data(contentsOf: URL(fileURLWithPath: dmgPath)),
               let sigData = try? Data(contentsOf: URL(fileURLWithPath: sigPath)) else {
             debugLog("[minimuxer] ERROR: Unable to read developer disk image or signature files")
-            throw MinimuxerError.mount(protocol: .lockdown, reason: "Unable to read pre-17 image files at: \(dmgPath)")
+            throw MinimuxerError.mount(protocol: .lockdown, reason: "无法读取 pre-17 映像文件：\(dmgPath)")
         }
         return (dmgData, sigData)
     }
@@ -214,7 +214,7 @@ final internal class Mounter {
                 verboseLog("[minimuxer] Downloading \(path.lastPathComponent)...")
                 guard let url = URL(string: urlStr), let data = try? Data(contentsOf: url) else {
                     debugLog("[minimuxer] ERROR: Failed to download \(path.lastPathComponent)")
-                    throw MinimuxerError.downloadImage("Failed to download post-17 file from \(urlStr)")
+                    throw MinimuxerError.downloadImage("从 \(urlStr) 下载 post-17 文件失败")
                 }
                 try data.write(to: path)
             }

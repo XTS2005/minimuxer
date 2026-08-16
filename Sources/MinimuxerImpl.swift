@@ -62,7 +62,7 @@ final internal class MinimuxerImpl: MinimuxerAPI {
             try await isDDIMounted()
         }
         guard ddiMounted else {
-            let msg = isrppairing ? "dmg=\(ddiMounted) started=\(MuxerService.shared.isListening)" : "DeveloperDiskImage is not mounted"
+            let msg = isrppairing ? "dmg=\(ddiMounted) started=\(MuxerService.shared.isListening)" : "DeveloperDiskImage 未挂载"
             if isrppairing {
                 verboseLog("minimuxer not ready (\(activeProtocol)): \(msg)")
             }
@@ -74,13 +74,13 @@ final internal class MinimuxerImpl: MinimuxerAPI {
     func isReady(withDDIMountCheck: Bool = false) async -> Result<Bool, MinimuxerError> {
         if !isPairingFileLoaded {
             debugLog("[minimuxer] minimuxer not ready: pairing file not loaded")
-            return .failure(.pairingNotLoaded("No valid pairing file has been loaded"))
+            return .failure(.pairingNotLoaded("尚未加载有效的配对文件"))
         }
 
         let currentStatus = await state.with { $0.status }
         if currentStatus != .started {
             debugLog("[minimuxer] minimuxer not ready: minimuxer has not been started")
-            return .failure(.notStarted("Minimuxer has not been started"))
+            return .failure(.notStarted("Minimuxer 尚未启动"))
         }
 
         // check connection status first
@@ -90,7 +90,7 @@ final internal class MinimuxerImpl: MinimuxerAPI {
                 Minimuxer.network.isBridgeSatisfied */
         ){
             debugLog("[minimuxer] minimuxer not ready: no network connection")
-            return .failure(.noConnection("No wifi interface satisfied"))
+            return .failure(.noConnection("没有满足条件的 Wi-Fi 接口"))
         }
 
         // check connection mode
@@ -105,14 +105,14 @@ final internal class MinimuxerImpl: MinimuxerAPI {
                 let uTunPresent = net.isUTunAvailable
                 if !uTunPresent {
                     debugLog("[minimuxer] minimuxer not ready: no utun interface found")
-                    return .failure(.noVPN("No utun interface detected — LocalDevVPN is not connected"))
+                    return .failure(.noVPN("未检测到 utun 接口——LocalDevVPN 未连接"))
                 }
 
                 // check iKEv2 too if in lockdown mode and ios >= 26.4
                 if !isrppairing && !net.isIKEv2IPSecAvailable {
                     if #available(iOS 26.4, *) {
                         debugLog("[minimuxer] minimuxer not ready: no ipsec interface (required for lockdown on iOS 26.4+)")
-                        return .failure(.invalidVPN("utun is present but no ipsec/IKEv2 interface found — LocalDevVPN may not support the lockdown protocol on iOS 26.4+"))
+                        return .failure(.invalidVPN("存在 utun 接口，但未找到 ipsec/IKEv2 接口——LocalDevVPN 可能不支持 iOS 26.4+ 上的 lockdown 协议"))
                     }
                 }
 
@@ -124,7 +124,7 @@ final internal class MinimuxerImpl: MinimuxerAPI {
         let pairingType = getPairingFileType()
         if pairingType == .unknown {
             debugLog("[minimuxer] minimuxer not ready: no valid pairing file loaded")
-            return .failure(.pairingNotLoaded("No valid pairing file has been loaded in Minimuxer"))
+            return .failure(.pairingNotLoaded("Minimuxer 中尚未加载有效的配对文件"))
         }
 
         // then check if device is ready
@@ -135,10 +135,10 @@ final internal class MinimuxerImpl: MinimuxerAPI {
             switch connectionMode {
             case .localVPN:
                 debugLog("[minimuxer] minimuxer not ready: tunnel peer IP not available despite tunnel iface being present")
-                return .failure(.noDevice("VPN tunnel iface is up but tunnel peer IP is not yet reachable — VPN may not be routing device traffic correctly. Cause: \(error.localizedDescription)"))
+                return .failure(.noDevice("VPN 隧道接口已启用，但隧道对端 IP 尚不可达——VPN 可能未正确路由设备流量。原因：\(error.localizedDescription)"))
             case .remoteServer:
                 debugLog("[minimuxer] minimuxer not ready: remote endpoint IP is not configured or reachable")
-                return .failure(.noDevice("Remote endpoint IP is not configured or reachable. Cause: \(error.localizedDescription)"))
+                return .failure(.noDevice("远程端点 IP 未配置或不可达。原因：\(error.localizedDescription)"))
             case .notConfigured:
                 return .failure(connectionNotConfiguredError())
             }
@@ -149,10 +149,10 @@ final internal class MinimuxerImpl: MinimuxerAPI {
             switch connectionMode {
             case .localVPN:
                 debugLog("[minimuxer] minimuxer not ready: failed to connect to tunnel peer IP")
-                return .failure(.invalidVPN("VPN tunnel iface is up and tunnel peer IP \(deviceIp) is known, but TCP port poll failed — device may be unreachable on this interface"))
+                return .failure(.invalidVPN("VPN 隧道接口已启用且隧道对端 IP \(deviceIp) 已知，但 TCP 端口轮询失败——设备在此接口上可能不可达"))
             case .remoteServer:
                 debugLog("[minimuxer] minimuxer not ready: failed to connect to remote endpoint IP \(deviceIp)")
-                return .failure(.notReachable("Remote endpoint \(deviceIp) is configured, but TCP port poll failed — target device is unreachable"))
+                return .failure(.notReachable("远程端点 \(deviceIp) 已配置，但 TCP 端口轮询失败——目标设备不可达"))
             case .notConfigured:
                 return .failure(connectionNotConfiguredError())
             }
@@ -180,7 +180,7 @@ final internal class MinimuxerImpl: MinimuxerAPI {
 
         if !isrppairing {
             guard MuxerService.shared.isListening else {
-                return .failure(.muxerNotListening("Usbmuxd fake server is not listening"))
+                return .failure(.muxerNotListening("Usbmuxd 模拟服务器未在监听"))
             }
         }
 
@@ -209,7 +209,7 @@ final internal class MinimuxerImpl: MinimuxerAPI {
         } catch let err as IdeviceGatewayError {
             if case .connectionFailed(let reason) = err,
                reason.lowercased().contains("broken pipe") || reason.lowercased().contains("brokenpipe") {
-                throw MinimuxerError.noVPN("VPN tunnel connection severed \(context). Cause: \(reason)")
+                throw MinimuxerError.noVPN("VPN 隧道连接已断开 \(context)。原因：\(reason)")
             }
             return fallback
         } catch {
@@ -234,7 +234,7 @@ final internal class MinimuxerImpl: MinimuxerAPI {
     private func connectionNotConfiguredError() -> MinimuxerError{
         let modes: [DeviceConnectionMode] = [.localVPN, .remoteServer]
         debugLog("[minimuxer] minimuxer not ready: connection mode not configured. Supported modes: \(modes)")
-        return MinimuxerError.connectionModeNotConfigured("Connection mode not configured. Supported modes: \(modes)")
+        return MinimuxerError.connectionModeNotConfigured("未配置连接模式。支持的模式：\(modes)")
     }
     
     
@@ -243,13 +243,13 @@ final internal class MinimuxerImpl: MinimuxerAPI {
         // restartMuxerServer only applies to the lockdown protocol path
         guard let pairingDict = IdeviceGateway.shared.pairingDataDict else {
             debugLog("[minimuxer] ERROR: Pairing DICT missing...ignoring restart MuxerServer")
-            throw MinimuxerError.invalidPairing(protocol: .lockdown, reason: "Pairing dictionary is missing in gateway")
+            throw MinimuxerError.invalidPairing(protocol: .lockdown, reason: "网关中缺少配对字典")
         }
         verboseLog("[minimuxer] loaded pairing file keys: \(pairingDict.keys)")
 
         guard let deviceUDID = pairingDict["UDID"] as? String else {
             debugLog("[minimuxer] ERROR: Pairing file missing UDID")
-            throw MinimuxerError.invalidPairing(protocol: .lockdown, reason: "Pairing file is missing UDID value")
+            throw MinimuxerError.invalidPairing(protocol: .lockdown, reason: "配对文件缺少 UDID 值")
         }
 
         // restart muxer
@@ -311,7 +311,7 @@ final internal class MinimuxerImpl: MinimuxerAPI {
     private func restartWith(pairingFile: String, op: String) async throws {
         let activeProtocol: PairingProtocol = isrppairing ? .rppairing : .lockdown
         guard let mountPath = await state.lastDocsPath else {
-            throw MinimuxerError.mount(protocol: activeProtocol, reason: "start() should be invoked before requesting \(op). cause: lastDocsPath is nil")
+            throw MinimuxerError.mount(protocol: activeProtocol, reason: "请求 \(op) 之前应首先调用 start()。原因：lastDocsPath 为空")
         }
         await stop()
         try await start(pairingFile: pairingFile, mountPath: mountPath)
@@ -323,7 +323,7 @@ final internal class MinimuxerImpl: MinimuxerAPI {
         guard let pairingData = IdeviceGateway.shared.pairingFileData,
               let pairingFile = String(data: pairingData, encoding: .utf8) else {
             debugLog("[minimuxer] restart: no existing pairing file — cannot restart")
-            throw MinimuxerError.invalidPairing(protocol: activeProtocol, reason: "No existing pairing file found in gateway during restart")
+            throw MinimuxerError.invalidPairing(protocol: activeProtocol, reason: "重启期间网关中未找到现有配对文件")
         }
         try await restartWith(pairingFile: pairingFile, op: "restart")
         await Minimuxer.network.refreshEndpoint()
@@ -373,7 +373,7 @@ final internal class MinimuxerImpl: MinimuxerAPI {
         }
         guard let mountPath = await state.lastDocsPath else {
             let activeProtocol: PairingProtocol = isrppairing ? .rppairing : .lockdown
-            throw MinimuxerError.mount(protocol: activeProtocol, reason: "DDI mount path not set")
+            throw MinimuxerError.mount(protocol: activeProtocol, reason: "未设置 DDI 挂载路径")
         }
         verboseLog("[minimuxer] DDI not mounted, mounting now before launching debug session...")
         try await Mounter.shared.mount(docsPath: mountPath)

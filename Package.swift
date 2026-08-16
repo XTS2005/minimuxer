@@ -25,15 +25,15 @@ let package = Package(
 //            url: "https://github.com/jkcoxson/idevice/releases/download/v0.1.64/idevice-xcframework-v0.1.64.zip",
 //            checksum: "b8250402a23c850f80b9be1d4add309aae6c935ee6a797b73616e4d8f170be5d"
 //        ),
-         .binaryTarget(
-             name: "IDevice",
-             url: "https://github.com/SideStore/idevice/releases/download/v0.1.65-ss-895f502/idevice-xcframework-v0.1.65-ss-895f502.zip",
-             checksum: "6dbc7589b5796a5ec1f622e3e7a5e7a999adb2a5b58c876faa63b26c513f1610"
-         ),
-//        .binaryTarget(
-//            name: "IDevice",
-//            path: "../../local/idevice/swift/bundle.zip"
-//        ),
+        .binaryTarget(
+            name: "IDevice",
+            url: "https://github.com/SideStore/idevice/releases/download/v0.1.64-ss-7ec402e/idevice-xcframework-v0.1.64-ss-7ec402e.zip",
+            checksum: "b148f8dc918e9c6ac8c1e573ec571250a7fb9d63c7a28116b732d598b5ba96b5"
+        ),
+//         .binaryTarget(
+//             name: "IDevice",
+//             path: "../../local/idevice/swift/bundle.zip"
+//         ),
         .binaryTarget(
             name: "EMProxy",
             url: "https://github.com/SideStore/em_proxy/releases/download/v0.9.2/EMProxy.xcframework.zip",

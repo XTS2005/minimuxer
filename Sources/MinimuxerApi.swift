@@ -25,7 +25,6 @@ public enum DeviceConnectionMode: String, Codable, Sendable {
 public struct ConnectionConfigBinding: Sendable {
     public let setTunnelIfaceIp: @Sendable (String?) -> Void
     public let setTunnelPeerIp: @Sendable (String?) -> Void
-    public let setTunnelPeerSubnetMask: @Sendable (String?) -> Void
     public let setTunnelPeerReachable: @Sendable (Bool) -> Void
     public let setTunnelIfaceSubnetMask: @Sendable (String?) -> Void
     public let setRemoteReachable: @Sendable (Bool) -> Void
@@ -38,7 +37,6 @@ public struct ConnectionConfigBinding: Sendable {
     public init(
         setTunnelIfaceIp: @escaping @Sendable (String?) -> Void,
         setTunnelPeerIp: @escaping @Sendable (String?) -> Void,
-        setTunnelPeerSubnetMask: @escaping @Sendable (String?) -> Void,
         setTunnelPeerReachable: @escaping @Sendable (Bool) -> Void,
         setTunnelIfaceSubnetMask: @escaping @Sendable (String?) -> Void,
         getRemoteServerIp: @escaping @Sendable () -> String,
@@ -49,7 +47,6 @@ public struct ConnectionConfigBinding: Sendable {
     ) {
         self.setTunnelIfaceIp = setTunnelIfaceIp
         self.setTunnelPeerIp = setTunnelPeerIp
-        self.setTunnelPeerSubnetMask = setTunnelPeerSubnetMask
         self.setTunnelPeerReachable = setTunnelPeerReachable
         self.setTunnelIfaceSubnetMask = setTunnelIfaceSubnetMask
         self.getRemoteServerIp = getRemoteServerIp
@@ -128,18 +125,18 @@ public extension EMProxyAPI {
 }
 
 public enum LocalInterfaceType: String, Hashable, Sendable, CaseIterable, Comparable {
-    case vpnUtun = "VPN (uTun)"
-    case vpnIpsec = "VPN (IPSec)"
+    case vpnUtun = "VPN（uTun）"
+    case vpnIpsec = "VPN（IPSec）"
     case wifi = "Wi-Fi"
-    case usbLinkLocal = "USB / Link-Local"
-    case ethernet = "Ethernet / Adapter"
-    case cellular = "Cellular"
-    case airdrop = "AirDrop (AWDL)"
-    case lowLatencyWLAN = "Low-Latency WLAN"
-    case hotspotBridge = "Personal Hotspot / Bridge"
-    case loopback = "Loopback"
-    case packetCapture = "Packet Capture"
-    case other = "Other"
+    case usbLinkLocal = "USB / 本地链路"
+    case ethernet = "以太网 / 适配器"
+    case cellular = "蜂窝网络"
+    case airdrop = "AirDrop（AWDL）"
+    case lowLatencyWLAN = "低延迟 WLAN"
+    case hotspotBridge = "个人热点 / 桥接"
+    case loopback = "回环"
+    case packetCapture = "数据包捕获"
+    case other = "其它"
 
     private static let priorityOrder: [LocalInterfaceType] = [
         .wifi,

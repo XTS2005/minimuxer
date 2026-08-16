@@ -49,7 +49,7 @@ final internal class MuxerService {
         isListening = false
 
         guard let port = NWEndpoint.Port(rawValue: MinimuxerConstants.usbmuxdPort) else {
-            throw MinimuxerError.connect("Invalid usbmuxd port: \(MinimuxerConstants.usbmuxdPort)")
+            throw MinimuxerError.connect("无效的 usbmuxd 端口：\(MinimuxerConstants.usbmuxdPort)")
         }
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
@@ -76,7 +76,7 @@ final internal class MuxerService {
                         self.started = false
                         if !hasResponded {
                             hasResponded = true
-                            continuation.resume(throwing: MinimuxerError.connect("MuxerService failed to bind: \(error.localizedDescription)"))
+                            continuation.resume(throwing: MinimuxerError.connect("MuxerService 绑定失败：\(error.localizedDescription)"))
                         }
                     case .cancelled:
                         self.isListening = false
@@ -176,7 +176,7 @@ final internal class MuxerService {
     // (lockdown requires UDID to start session, so our server responds with data read from pair file)
     private func handlePacket(_ packet: RawPacket) throws -> [String: Any] {
         guard let messageType = packet.plist["MessageType"] as? String else {
-            throw MinimuxerError.connect("Malformed usbmuxd packet: missing MessageType field")
+            throw MinimuxerError.connect("格式错误的 usbmuxd 数据包：缺少 MessageType 字段")
         }
 
         verboseLog("[minimuxer] usbmux message: \(messageType)")
@@ -187,7 +187,7 @@ final internal class MuxerService {
                     return ["DeviceList": []]
                 }
                 guard let udid = deviceUDID else {
-                    throw MinimuxerError.invalidPairing(protocol: .lockdown, reason: "No device UDID available for ListDevices response")
+                    throw MinimuxerError.invalidPairing(protocol: .lockdown, reason: "ListDevices 响应中没有可用的设备 UDID")
                 }
                 let payload: [String: Any] = [
                     "DeviceID": 0,                                                      // don't care
@@ -203,7 +203,7 @@ final internal class MuxerService {
                 return ["DeviceList": [payload]]
             default:
                 debugLog("[minimuxer] WARN: unknown message type: \(messageType)")
-                throw MinimuxerError.connect("Unsupported usbmuxd message type: \(messageType)")
+                throw MinimuxerError.connect("不支持的 usbmuxd 消息类型：\(messageType)")
         }
     }
 

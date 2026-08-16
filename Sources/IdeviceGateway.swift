@@ -20,17 +20,17 @@ internal enum IdeviceGatewayError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidPairingFile(let reason):
-            return "The pairing file is invalid: \(reason)"
+            return "配对文件无效：\(reason)"
         case .connectionFailed(let reason):
-            return "Failed to connect to device: \(reason)"
+            return "连接设备失败：\(reason)"
         case .serviceError(let reason):
-            return "Service operation failed: \(reason)"
+            return "服务操作失败：\(reason)"
         case .noConnection:
-            return "No connection to the device."
+            return "与设备没有连接。"
         case .notInitialized:
-            return "IdeviceGateway not initialized. start() should be called first."
+            return "IdeviceGateway 未初始化。应首先调用 start()。"
         case .deviceEndpointIpNotAvailable:
-            return "Device endpoint IP is not available."
+            return "设备端点 IP 不可用。"
         }
     }
 
@@ -67,7 +67,7 @@ internal final class IdeviceGateway {
         if let msgPtr = err.pointee.message {
             return String(cString: msgPtr).cleanedErrorFormatting
         }
-        return "Error code \(err.pointee.code)"
+        return "错误代码 \(err.pointee.code)"
     }
 
     private func safeFreeError(_ err: UnsafeMutablePointer<IdeviceFfiError>?) {
@@ -102,7 +102,7 @@ internal final class IdeviceGateway {
 
     static func validatePairingFile(from plist: [String: Any]?) throws -> PairingProtocol {
         guard let plist = plist else {
-            throw IdeviceGatewayError.invalidPairingFile(reason: "The file could not be parsed as a property list (plist).")
+            throw IdeviceGatewayError.invalidPairingFile(reason: "文件无法解析为属性列表（plist）。")
         }
 
         let requiredRPKeys = ["private_key", "public_key", "identifier"]
@@ -122,7 +122,7 @@ internal final class IdeviceGateway {
         }
 
         throw IdeviceGatewayError.invalidPairingFile(
-            reason: "The pairing file is incomplete. Missing Remote Pairing attributes: \(missingRPKeys.joined(separator: ", ")); missing Lockdown attributes: \(missingLockdownKeys.joined(separator: ", "))."
+            reason: "配对文件不完整。缺少远程配对属性：\(missingRPKeys.joined(separator: ", "))；缺少 Lockdown 属性：\(missingLockdownKeys.joined(separator: ", "))。"
         )
     }
     private(set) var pairingFileData: Data? = nil{
@@ -234,7 +234,7 @@ internal final class IdeviceGateway {
 
         guard let data = pairingFileContent.data(using: .utf8) else {
             debugLog("[IdeviceGateway] start() failed to decode pairingFileContent data as UTF-8")
-            throw IdeviceGatewayError.invalidPairingFile(reason: "UTF-8 encoding failed")
+            throw IdeviceGatewayError.invalidPairingFile(reason: "UTF-8 编码失败")
         }
 
         let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any]
@@ -255,7 +255,7 @@ internal final class IdeviceGateway {
                     let err = rp_pairing_file_from_bytes(baseAddress, UInt(data.count), &pairingFile)
                     if err != nil {
                         debugLog("[IdeviceGateway] start() rp_pairing_file_from_bytes failed")
-                        throw IdeviceGatewayError.invalidPairingFile(reason: "rp_pairing_file_from_bytes failed")
+                        throw IdeviceGatewayError.invalidPairingFile(reason: "rp_pairing_file_from_bytes 失败")
                     }
                 }
             }
@@ -272,7 +272,7 @@ internal final class IdeviceGateway {
                     let err = idevice_pairing_file_from_bytes(baseAddress, UInt(data.count), &pairingFile)
                     if err != nil {
                         debugLog("[IdeviceGateway] start() idevice_pairing_file_from_bytes failed")
-                        throw IdeviceGatewayError.invalidPairingFile(reason: "idevice_pairing_file_from_bytes failed")
+                        throw IdeviceGatewayError.invalidPairingFile(reason: "idevice_pairing_file_from_bytes 失败")
                     }
                     verboseLog("[IdeviceGateway] start() loaded lockdown pairingFile successfully")
                 }
@@ -290,7 +290,7 @@ internal final class IdeviceGateway {
 
         guard let pairingFile = pairingFile else {
             debugLog("[IdeviceGateway] ensureRPConnection() failed because pairingFile is nil")
-            throw IdeviceGatewayError.invalidPairingFile(reason: "pairingFile is nil")
+            throw IdeviceGatewayError.invalidPairingFile(reason: "配对文件为空")
         }
 
         guard let deviceEndpointIp = deviceEndpointIp else {
@@ -337,12 +337,12 @@ internal final class IdeviceGateway {
             defer { idevice_error_free(err) }
             
             if isPairingError(err) {
-                let reason = "Handshake failed: \(msg.isEmpty ? "Unknown FFI error" : msg)"
+                let reason = "握手失败：\(msg.isEmpty ? "未知 FFI 错误" : msg)"
                 let error = IdeviceGatewayError.invalidPairingFile(reason: reason)
                 lastError = error
                 throw error
             } else {
-                let error = IdeviceGatewayError.connectionFailed(msg.isEmpty ? "Tunnel creation failed" : msg)
+                let error = IdeviceGatewayError.connectionFailed(msg.isEmpty ? "创建隧道失败" : msg)
                 lastError = error
                 throw error
             }
@@ -396,7 +396,7 @@ internal final class IdeviceGateway {
                 try ensureRPConnection()
                 err = connect(adapter, handshake, &client)
             } catch {
-                let reason = "Service connection retry failed: \(error.localizedDescription)"
+                let reason = "服务连接重试失败：\(error.localizedDescription)"
                 let errObj = IdeviceGatewayError.serviceError(reason)
                 lastError = errObj
                 throw errObj
@@ -415,12 +415,12 @@ internal final class IdeviceGateway {
                 invalidateConnection()
                 
                 if isPairingError(secondErr) {
-                    let reason = "Service connection failed, error: (\(retryMsg.isEmpty ? "Unknown FFI error" : retryMsg))"
+                    let reason = "服务连接失败，错误：(\(retryMsg.isEmpty ? "未知 FFI 错误" : retryMsg))"
                     let error = IdeviceGatewayError.invalidPairingFile(reason: reason)
                     lastError = error
                     throw error
                 } else {
-                    let error = IdeviceGatewayError.serviceError("Failed to connect to \(serviceName), error: (\(retryMsg.isEmpty ? "Unknown FFI error" : retryMsg))")
+                    let error = IdeviceGatewayError.serviceError("连接到 \(serviceName) 失败，错误：(\(retryMsg.isEmpty ? "未知 FFI 错误" : retryMsg))")
                     lastError = error
                     throw error
                 }
@@ -428,7 +428,7 @@ internal final class IdeviceGateway {
         }
         guard let client = client else {
             debugLog("[IdeviceGateway] performWithService(\(serviceName)) client is nil")
-            throw IdeviceGatewayError.serviceError("Connected client for \(serviceName) was nil")
+            throw IdeviceGatewayError.serviceError("\(serviceName) 的连接客户端为空")
         }
         defer {
             verboseLog("[IdeviceGateway] performWithService(\(serviceName)) performing cleanup")
@@ -491,11 +491,11 @@ internal final class IdeviceGateway {
             let msg = self.getErrorMessage(from: err)
             debugLog("[IdeviceGateway] performWithUsbmuxdService(\(serviceName)) addr creation failed: code=\(err.pointee.code), message=\(msg)")
             defer { idevice_error_free(err) }
-            throw IdeviceGatewayError.connectionFailed("Failed to get usbmuxd addr: \(msg)")
+            throw IdeviceGatewayError.connectionFailed("获取 usbmuxd 地址失败：\(msg)")
         }
         guard let addr = addr else {
             debugLog("[IdeviceGateway] performWithUsbmuxdService(\(serviceName)) usbmuxd addr is nil")
-            throw IdeviceGatewayError.connectionFailed("Usbmuxd addr was nil")
+            throw IdeviceGatewayError.connectionFailed("usbmuxd 地址为空")
         }
         
         var provider: OpaquePointer? = nil
@@ -508,7 +508,7 @@ internal final class IdeviceGateway {
             debugLog("[IdeviceGateway] performWithUsbmuxdService(\(serviceName)) new_default_connection failed: code=\(connErr.pointee.code), message=\(msg)")
             defer { idevice_error_free(connErr) }
             idevice_usbmuxd_addr_free(addr)
-            throw IdeviceGatewayError.connectionFailed("Failed to connect to usbmuxd: \(msg)")
+            throw IdeviceGatewayError.connectionFailed("连接到 usbmuxd 失败：\(msg)")
         }
         
         if let conn = conn {
@@ -521,7 +521,7 @@ internal final class IdeviceGateway {
                 debugLog("[IdeviceGateway] performWithUsbmuxdService(\(serviceName)) get_devices failed: code=\(devErr.pointee.code), message=\(msg)")
                 defer { idevice_error_free(devErr) }
                 idevice_usbmuxd_addr_free(addr)
-                throw IdeviceGatewayError.connectionFailed("Failed to list usbmuxd devices: \(msg)")
+                throw IdeviceGatewayError.connectionFailed("列出 usbmuxd 设备失败：\(msg)")
             }
             verboseLog("[IdeviceGateway] performWithUsbmuxdService(\(serviceName)) found \(count) devices")
             if count > 0, let devicesPtr = devices, let firstDev = devicesPtr.pointee {
@@ -536,23 +536,23 @@ internal final class IdeviceGateway {
             } else {
                 verboseLog("[IdeviceGateway] performWithUsbmuxdService(\(serviceName)) no devices found on usbmuxd")
                 idevice_usbmuxd_addr_free(addr)
-                throw IdeviceGatewayError.connectionFailed("No devices found on usbmuxd")
+                throw IdeviceGatewayError.connectionFailed("在 usbmuxd 上找不到设备")
             }
         } else {
             debugLog("[IdeviceGateway] performWithUsbmuxdService(\(serviceName)) usbmuxd connection was nil")
             idevice_usbmuxd_addr_free(addr)
-            throw IdeviceGatewayError.connectionFailed("Usbmuxd connection was nil")
+            throw IdeviceGatewayError.connectionFailed("usbmuxd 连接为空")
         }
         
         if let provErr = provErr {
             let msg = self.getErrorMessage(from: provErr)
             debugLog("[IdeviceGateway] performWithUsbmuxdService(\(serviceName)) provider creation failed: code=\(provErr.pointee.code), message=\(msg)")
             defer { idevice_error_free(provErr) }
-            throw IdeviceGatewayError.connectionFailed("Failed to create usbmuxd provider: \(msg)")
+            throw IdeviceGatewayError.connectionFailed("创建 usbmuxd 提供程序失败：\(msg)")
         }
         guard let provider = provider else {
             debugLog("[IdeviceGateway] performWithUsbmuxdService(\(serviceName)) provider is nil")
-            throw IdeviceGatewayError.connectionFailed("Usbmuxd provider was nil")
+            throw IdeviceGatewayError.connectionFailed("usbmuxd 提供程序为空")
         }
         var providerToFree: OpaquePointer? = provider
         defer {
@@ -568,11 +568,11 @@ internal final class IdeviceGateway {
             let msg = self.getErrorMessage(from: connectErr)
             debugLog("[IdeviceGateway] performWithUsbmuxdService(\(serviceName)) connect failed: code=\(connectErr.pointee.code), message=\(msg)")
             defer { idevice_error_free(connectErr) }
-            throw IdeviceGatewayError.serviceError("Failed to connect to \(serviceName), error: (\(msg))")
+            throw IdeviceGatewayError.serviceError("连接到 \(serviceName) 失败，错误：(\(msg))")
         }
         guard let client = client else {
             debugLog("[IdeviceGateway] performWithUsbmuxdService(\(serviceName)) client is nil")
-            throw IdeviceGatewayError.serviceError("Connected client for \(serviceName) was nil")
+            throw IdeviceGatewayError.serviceError("\(serviceName) 的连接客户端为空")
         }
         defer {
             verboseLog("[IdeviceGateway] performWithUsbmuxdService(\(serviceName)) performing cleanup")
@@ -605,7 +605,7 @@ internal final class IdeviceGateway {
 
         guard let pairingFileData = self.pairingFileData else {
             debugLog("[IdeviceGateway] error: pairingFileData is nil")
-            throw IdeviceGatewayError.connectionFailed("pairingFileData is nil")
+            throw IdeviceGatewayError.connectionFailed("配对文件数据为空")
         }
 
         var tempPairingFile: OpaquePointer? = nil
@@ -616,10 +616,10 @@ internal final class IdeviceGateway {
             let msg = self.getErrorMessage(from: parseErr)
             debugLog("[IdeviceGateway] error: Failed to parse temporary pairing file: \(msg)")
             defer { safeFreeError(parseErr) }
-            throw IdeviceGatewayError.connectionFailed("Failed to parse temporary pairing file: \(msg)")
+            throw IdeviceGatewayError.connectionFailed("解析临时配对文件失败：\(msg)")
         }
         guard let tempPairingFile = tempPairingFile else {
-            throw IdeviceGatewayError.connectionFailed("Temporary pairing file was nil")
+            throw IdeviceGatewayError.connectionFailed("临时配对文件为空")
         }
 
         var provider: OpaquePointer? = nil
@@ -632,11 +632,11 @@ internal final class IdeviceGateway {
             let msg = self.getErrorMessage(from: provErr)
             debugLog("[IdeviceGateway] error: Failed to create TCP provider: \(msg)")
             defer { safeFreeError(provErr) }
-            throw IdeviceGatewayError.connectionFailed("Failed to create TCP provider: \(msg)")
+            throw IdeviceGatewayError.connectionFailed("创建 TCP 提供程序失败：\(msg)")
         }
         guard let provider = provider else {
             debugLog("[IdeviceGateway] error: TCP Provider was nil")
-            throw IdeviceGatewayError.connectionFailed("TCP Provider was nil")
+            throw IdeviceGatewayError.connectionFailed("TCP 提供程序为空")
         }
         var providerToFree: OpaquePointer? = provider
         defer {
@@ -652,7 +652,7 @@ internal final class IdeviceGateway {
             let msg = self.getErrorMessage(from: connectErr)
             debugLog("[IdeviceGateway] error: \(serviceName) connect failed: code=\(connectErr.pointee.code), message=\(msg)")
             defer { safeFreeError(connectErr) }
-            throw IdeviceGatewayError.serviceError("Failed to connect to \(serviceName), error: (\(msg))")
+            throw IdeviceGatewayError.serviceError("连接到 \(serviceName) 失败，错误：(\(msg))")
         }
         guard let client = client else {
             throw IdeviceGatewayError.noConnection
@@ -793,7 +793,7 @@ internal final class IdeviceGateway {
                 let msg = self.getErrorMessage(from: valErr)
                 debugLog("[IdeviceGateway] getLockdownValue lockdownd_get_value failed for \(key): \(msg)")
                 defer { safeFreeError(valErr) }
-                throw IdeviceGatewayError.serviceError("Failed to get lockdown value for key \(key), error: (\(msg))")
+                throw IdeviceGatewayError.serviceError("获取键 \(key) 的 lockdown 值失败，错误：(\(msg))")
             }
             if let plistVal = plistVal {
                 defer {
@@ -825,7 +825,7 @@ internal final class IdeviceGateway {
                         let msg = self.getErrorMessage(from: installErr)
                         debugLog("[IdeviceGateway] installProvisioningProfile() misagent_install failed: \(msg)")
                         defer { safeFreeError(installErr) }
-                        throw IdeviceGatewayError.serviceError("Failed to install profile, error: (\(msg))")
+                        throw IdeviceGatewayError.serviceError("安装描述文件失败，错误：(\(msg))")
                     }
                     debugLog("[IdeviceGateway] installProvisioningProfile() misagent_install succeeded")
                 }
@@ -849,7 +849,7 @@ internal final class IdeviceGateway {
                     let msg = self.getErrorMessage(from: removeErr)
                     debugLog("[IdeviceGateway] removeProvisioningProfile() misagent_remove failed: \(msg)")
                     defer { safeFreeError(removeErr) }
-                    throw IdeviceGatewayError.serviceError("Failed to remove profile, error: (\(msg))")
+                    throw IdeviceGatewayError.serviceError("移除描述文件失败，错误：(\(msg))")
                 }
                 debugLog("[IdeviceGateway] removeProvisioningProfile() misagent_remove succeeded")
             }
@@ -872,7 +872,7 @@ internal final class IdeviceGateway {
                     let msg = self.getErrorMessage(from: uninstallErr)
                     debugLog("[IdeviceGateway] removeApp() installation_proxy_uninstall failed: \(msg)")
                     defer { idevice_error_free(uninstallErr) }
-                    throw IdeviceGatewayError.serviceError("Failed to uninstall app, error: (\(msg))")
+                    throw IdeviceGatewayError.serviceError("卸载应用失败，错误：(\(msg))")
                 }
                 debugLog("[IdeviceGateway] removeApp() installation_proxy_uninstall succeeded")
             }
@@ -910,7 +910,7 @@ internal final class IdeviceGateway {
                 let msg = self.getErrorMessage(from: openErr)
                 debugLog("[IdeviceGateway] yeetAppAfc() afc_file_open failed: \(msg)")
                 defer { idevice_error_free(openErr) }
-                throw IdeviceGatewayError.serviceError("Failed to open remote AFC file, error: (\(msg))")
+                throw IdeviceGatewayError.serviceError("打开远程 AFC 文件失败，错误：(\(msg))")
             }
             defer {
                 verboseLog("[IdeviceGateway] yeetAppAfc() closing remote file handle")
@@ -925,7 +925,7 @@ internal final class IdeviceGateway {
                         let msg = self.getErrorMessage(from: writeErr)
                         debugLog("[IdeviceGateway] yeetAppAfc() afc_file_write failed: \(msg)")
                         defer { idevice_error_free(writeErr) }
-                        throw IdeviceGatewayError.serviceError("Failed to write to AFC file, error: (\(msg))")
+                        throw IdeviceGatewayError.serviceError("写入 AFC 文件失败，错误：(\(msg))")
                     }
                     debugLog("[IdeviceGateway] yeetAppAfc() afc_file_write succeeded")
                 }
@@ -950,7 +950,7 @@ internal final class IdeviceGateway {
                     let msg = self.getErrorMessage(from: installErr)
                     debugLog("[IdeviceGateway] installIpa() installation_proxy_install failed: \(msg)")
                     defer { idevice_error_free(installErr) }
-                    throw IdeviceGatewayError.serviceError("Failed to install IPA, error: (\(msg))")
+                    throw IdeviceGatewayError.serviceError("安装 IPA 失败，错误：(\(msg))")
                 }
                 debugLog("[IdeviceGateway] installIpa() installation_proxy_install succeeded")
             }
@@ -976,14 +976,14 @@ internal final class IdeviceGateway {
                     let msg = self.getErrorMessage(from: err)
                     debugLog("[IdeviceGateway] getAppPaths() installation_proxy_get_apps failed: \(msg)")
                     defer { idevice_error_free(err) }
-                    throw IdeviceGatewayError.serviceError("Failed to lookup app paths, error: (\(msg))")
+                    throw IdeviceGatewayError.serviceError("查找应用路径失败，错误：(\(msg))")
                 }
             }
             
             verboseLog("[IdeviceGateway] getAppPaths() installation_proxy_get_apps returned outLen: \(outLen)")
             guard let resultPtr = outResult, outLen > 0 else {
                 verboseLog("[IdeviceGateway] getAppPaths() app not found")
-                throw IdeviceGatewayError.serviceError("App not found: \(appId)")
+                throw IdeviceGatewayError.serviceError("找不到应用：\(appId)")
             }
             
             let plistArray = resultPtr.assumingMemoryBound(to: plist_t?.self)
@@ -1015,7 +1015,7 @@ internal final class IdeviceGateway {
             
             if container.isEmpty || bundlePath.isEmpty {
                 debugLog("[IdeviceGateway] getAppPaths() container or bundlePath is empty")
-                throw IdeviceGatewayError.serviceError("Failed to resolve app paths")
+                throw IdeviceGatewayError.serviceError("解析应用路径失败")
             }
             return (container, bundlePath)
         }
@@ -1041,7 +1041,7 @@ internal final class IdeviceGateway {
                     let msg = self.getErrorMessage(from: sendErr)
                     debugLog("[IdeviceGateway] sendDebugProxyCommand() failed for command \(name): \(msg)")
                     defer { idevice_error_free(sendErr) }
-                    throw IdeviceGatewayError.serviceError("Failed to send command to debug proxy: \(name), error: (\(msg))")
+                    throw IdeviceGatewayError.serviceError("向调试代理发送命令失败：\(name)，错误：(\(msg))")
                 }
                 if let response = response {
                     let respStr = String(cString: response)
@@ -1052,7 +1052,7 @@ internal final class IdeviceGateway {
                 }
             } else {
                 debugLog("[IdeviceGateway] sendDebugProxyCommand() failed to construct command \(name)")
-                throw IdeviceGatewayError.serviceError("Failed to construct debug proxy command: \(name)")
+                throw IdeviceGatewayError.serviceError("构造调试代理命令失败：\(name)")
             }
         }
     }
@@ -1078,7 +1078,7 @@ internal final class IdeviceGateway {
                 let msg = self.getErrorMessage(from: err)
                 debugLog("[IdeviceGateway] launchAppPre17() failed to start debugserver: \(msg)")
                 defer { idevice_error_free(err) }
-                throw IdeviceGatewayError.serviceError("Failed to start debugserver service, error: (\(msg))")
+                throw IdeviceGatewayError.serviceError("启动 debugserver 服务失败，错误：(\(msg))")
             }
             debugLog("[IdeviceGateway] launchAppPre17() debugserver started on port: \(port)")
             
@@ -1087,11 +1087,11 @@ internal final class IdeviceGateway {
             if let addrErr = addrErr {
                 debugLog("[IdeviceGateway] launchAppPre17() default_addr_new failed")
                 defer { idevice_error_free(addrErr) }
-                throw IdeviceGatewayError.connectionFailed("Failed to get usbmuxd default addr")
+                throw IdeviceGatewayError.connectionFailed("获取 usbmuxd 默认地址失败")
             }
             guard let addr = addr else {
                 debugLog("[IdeviceGateway] launchAppPre17() usbmuxd default addr is nil")
-                throw IdeviceGatewayError.connectionFailed("Usbmuxd default addr was nil")
+                throw IdeviceGatewayError.connectionFailed("usbmuxd 默认地址为空")
             }
             defer { idevice_usbmuxd_addr_free(addr) }
             
@@ -1101,11 +1101,11 @@ internal final class IdeviceGateway {
             if let connErr = connErr {
                 debugLog("[IdeviceGateway] launchAppPre17() new_default_connection failed")
                 defer { idevice_error_free(connErr) }
-                throw IdeviceGatewayError.connectionFailed("Failed to create usbmuxd connection")
+                throw IdeviceGatewayError.connectionFailed("创建 usbmuxd 连接失败")
             }
             guard let conn = conn else {
                 debugLog("[IdeviceGateway] launchAppPre17() usbmuxd connection is nil")
-                throw IdeviceGatewayError.connectionFailed("Usbmuxd connection was nil")
+                throw IdeviceGatewayError.connectionFailed("usbmuxd 连接为空")
             }
             var connNeedsFree = true
             defer {
@@ -1120,12 +1120,12 @@ internal final class IdeviceGateway {
             if let devErr = devErr {
                 debugLog("[IdeviceGateway] launchAppPre17() get_devices failed")
                 defer { idevice_error_free(devErr) }
-                throw IdeviceGatewayError.connectionFailed("Failed to list usbmuxd devices")
+                throw IdeviceGatewayError.connectionFailed("列出 usbmuxd 设备失败")
             }
             
             guard count > 0, let devicesPtr = devices, let firstDev = devicesPtr.pointee else {
                 verboseLog("[IdeviceGateway] launchAppPre17() no devices found on usbmuxd")
-                throw IdeviceGatewayError.connectionFailed("No devices found on usbmuxd")
+                throw IdeviceGatewayError.connectionFailed("在 usbmuxd 上找不到设备")
             }
             defer { idevice_usbmuxd_device_list_free(devices, count) }
             
@@ -1139,13 +1139,13 @@ internal final class IdeviceGateway {
             if let connectErr = connectErr {
                 debugLog("[IdeviceGateway] launchAppPre17() connect_to_device failed")
                 defer { idevice_error_free(connectErr) }
-                throw IdeviceGatewayError.connectionFailed("Failed to connect to debugserver port \(port)")
+                throw IdeviceGatewayError.connectionFailed("连接到 debugserver 端口 \(port) 失败")
             }
             connNeedsFree = false
             
             guard let debugDevice = debugDevice else {
                 debugLog("[IdeviceGateway] launchAppPre17() debug device handle is nil")
-                throw IdeviceGatewayError.connectionFailed("Debug device handle was nil")
+                throw IdeviceGatewayError.connectionFailed("调试设备句柄为空")
             }
             var debugDeviceNeedsFree = true
             defer {
@@ -1160,13 +1160,13 @@ internal final class IdeviceGateway {
            if let streamErr = streamErr {
                debugLog("[IdeviceGateway] launchAppPre17() idevice_to_stream failed")
                defer { idevice_error_free(streamErr) }
-               throw IdeviceGatewayError.serviceError("Failed to convert device connection to stream")
+               throw IdeviceGatewayError.serviceError("将设备连接转换为流失败")
            }
             debugDeviceNeedsFree = false
             
             guard let stream = stream else {
                 debugLog("[IdeviceGateway] launchAppPre17() stream is nil")
-                throw IdeviceGatewayError.serviceError("Stream was nil")
+                throw IdeviceGatewayError.serviceError("流为空")
             }
             var streamNeedsFree = true
             defer {
@@ -1182,13 +1182,13 @@ internal final class IdeviceGateway {
                 let msg = self.getErrorMessage(from: proxyErr)
                 debugLog("[IdeviceGateway] launchAppPre17() debug_proxy_new failed: \(msg)")
                 defer { idevice_error_free(proxyErr) }
-                throw IdeviceGatewayError.serviceError("Failed to create debug proxy client, error: (\(msg))")
+                throw IdeviceGatewayError.serviceError("创建调试代理客户端失败，错误：(\(msg))")
             }
             streamNeedsFree = false
             
             guard let debugProxyClient = debugProxyClient else {
                 debugLog("[IdeviceGateway] launchAppPre17() debugProxyClient is nil")
-                throw IdeviceGatewayError.serviceError("Debug proxy client was nil")
+                throw IdeviceGatewayError.serviceError("调试代理客户端为空")
             }
             defer { debug_proxy_free(debugProxyClient) }
             
@@ -1205,7 +1205,7 @@ internal final class IdeviceGateway {
                     let msg = self.getErrorMessage(from: argvErr)
                     debugLog("[IdeviceGateway] launchAppPre17() debug_proxy_set_argv failed: \(msg)")
                     defer { idevice_error_free(argvErr) }
-                    throw IdeviceGatewayError.serviceError("Failed to set debug proxy argv, error: (\(msg))")
+                    throw IdeviceGatewayError.serviceError("设置调试代理 argv 失败，错误：(\(msg))")
                 }
                 if let response = response {
                     let respStr = String(cString: response)
@@ -1236,7 +1236,7 @@ internal final class IdeviceGateway {
               let majorStr = versionStr.split(separator: ".").first,
               let major = Int(majorStr) else {
             debugLog("[IdeviceGateway] debugApp() failed to get ProductVersion")
-            throw IdeviceGatewayError.serviceError("Failed to get product version for JIT")
+            throw IdeviceGatewayError.serviceError("为 JIT 获取产品版本失败")
         }
         
         verboseLog("[IdeviceGateway] debugApp() ProductVersion major: \(major)")
@@ -1295,7 +1295,7 @@ internal final class IdeviceGateway {
                 let msg = self.getErrorMessage(from: copyErr)
                 debugLog("[IdeviceGateway] dumpProfiles() misagent_copy_all failed: \(msg)")
                 defer { idevice_error_free(copyErr) }
-                throw IdeviceGatewayError.serviceError("Failed to copy profiles from misagent, error: (\(msg))")
+                throw IdeviceGatewayError.serviceError("从 misagent 复制描述文件失败，错误：(\(msg))")
             }
 
             let path = docsPath.hasPrefix("file://") ? String(docsPath.dropFirst(7)) : docsPath
@@ -1347,7 +1347,7 @@ internal final class IdeviceGateway {
                let msg = self.getErrorMessage(from: getErr)
                debugLog("[IdeviceGateway] performHeartbeat() heartbeat_get_marco failed: \(msg)")
                defer { idevice_error_free(getErr) }
-               throw IdeviceGatewayError.serviceError("Heartbeat receive failed, error: (\(msg))")
+               throw IdeviceGatewayError.serviceError("心跳接收失败，错误：(\(msg))")
            }
            verboseLog("[IdeviceGateway] performHeartbeat() calling heartbeat_send_polo")
            let sendErr = heartbeat_send_polo(client)
@@ -1355,7 +1355,7 @@ internal final class IdeviceGateway {
                let msg = self.getErrorMessage(from: sendErr)
                debugLog("[IdeviceGateway] performHeartbeat() heartbeat_send_polo failed: \(msg)")
                defer { idevice_error_free(sendErr) }
-               throw IdeviceGatewayError.serviceError("Heartbeat send failed, error: (\(msg))")
+               throw IdeviceGatewayError.serviceError("心跳发送失败，错误：(\(msg))")
            }
            debugLog("[IdeviceGateway] performHeartbeat() succeeded, newInterval: \(newInterval.pointee)")
        }
@@ -1384,7 +1384,7 @@ internal final class IdeviceGateway {
             if let valErr = valErr {
                 debugLog("[IdeviceGateway] mountPersonalizedDdiRsd() lockdownd_get_value failed")
                 defer { idevice_error_free(valErr) }
-                throw IdeviceGatewayError.serviceError("Failed to get UniqueChipID")
+                throw IdeviceGatewayError.serviceError("获取 UniqueChipID 失败")
             }
             if let plistVal = plistVal {
                 defer { plist_free(plistVal) }
@@ -1421,7 +1421,7 @@ internal final class IdeviceGateway {
                             let msg = self.getErrorMessage(from: mountErr)
                             debugLog("[IdeviceGateway] mountPersonalizedDdiRsd() mount failed: code=\(mountErr.pointee.code), message=\(msg)")
                             defer { idevice_error_free(mountErr) }
-                            throw IdeviceGatewayError.serviceError("Failed to mount personalized DDI, error: (\(msg))")
+                            throw IdeviceGatewayError.serviceError("挂载个性化 DDI 失败，错误：(\(msg))")
                         }
                         debugLog("[IdeviceGateway] mountPersonalizedDdiRsd() mount succeeded")
                     }
@@ -1445,7 +1445,7 @@ internal final class IdeviceGateway {
 
         guard let pairingFileData = self.pairingFileData else {
             debugLog("[IdeviceGateway] error: pairingFileData is nil")
-            throw IdeviceGatewayError.connectionFailed("pairingFileData is nil")
+            throw IdeviceGatewayError.connectionFailed("配对文件数据为空")
         }
 
         var tempPairingFile: OpaquePointer? = nil
@@ -1456,10 +1456,10 @@ internal final class IdeviceGateway {
             let msg = self.getErrorMessage(from: parseErr)
             debugLog("[IdeviceGateway] error: Failed to parse temporary pairing file: \(msg)")
             defer { safeFreeError(parseErr) }
-            throw IdeviceGatewayError.connectionFailed("Failed to parse temporary pairing file: \(msg)")
+            throw IdeviceGatewayError.connectionFailed("解析临时配对文件失败：\(msg)")
         }
         guard let tempPairingFile = tempPairingFile else {
-            throw IdeviceGatewayError.connectionFailed("Temporary pairing file was nil")
+            throw IdeviceGatewayError.connectionFailed("临时配对文件为空")
         }
 
         verboseLog("[IdeviceGateway] creating TCP provider to \(deviceEndpointIp):\(MinimuxerConstants.lockdowndPort)...")
@@ -1472,11 +1472,11 @@ internal final class IdeviceGateway {
         if let provErr = provErr {
             debugLog("[IdeviceGateway] error: Failed to create TCP provider")
             defer { safeFreeError(provErr) }
-            throw IdeviceGatewayError.connectionFailed("Failed to create TCP provider")
+            throw IdeviceGatewayError.connectionFailed("创建 TCP 提供程序失败")
         }
         guard let provider = provider else {
             debugLog("[IdeviceGateway] error: TCP Provider was nil")
-            throw IdeviceGatewayError.connectionFailed("TCP Provider was nil")
+            throw IdeviceGatewayError.connectionFailed("TCP 提供程序为空")
         }
 
         var providerToFree: OpaquePointer? = provider
@@ -1516,10 +1516,10 @@ internal final class IdeviceGateway {
                 let getPfErr = idevice_provider_get_pairing_file(provider, &pf)
                 if let getPfErr = getPfErr {
                     defer { idevice_error_free(getPfErr) }
-                    throw IdeviceGatewayError.connectionFailed("Failed to get pairing file for session retry")
+                    throw IdeviceGatewayError.connectionFailed("获取会话重试的配对文件失败")
                 }
                 guard let pf = pf else {
-                    throw IdeviceGatewayError.connectionFailed("Pairing file nil for session retry")
+                    throw IdeviceGatewayError.connectionFailed("会话重试的配对文件为空")
                 }
                 defer { idevice_pairing_file_free(pf) }
                 let sessionErr = lockdownd_start_session(lockdownClient, pf)
@@ -1533,14 +1533,14 @@ internal final class IdeviceGateway {
                 if let valErr2 = valErr2 {
                     debugLog("[IdeviceGateway] error: lockdownd_get_value failed with session too")
                     defer { idevice_error_free(valErr2) }
-                    throw IdeviceGatewayError.serviceError("Failed to get UniqueChipID")
+                    throw IdeviceGatewayError.serviceError("获取 UniqueChipID 失败")
                 }
             }
             if let plistVal = plistVal {
                 defer { plist_free(plistVal) }
                 if plist_dict_get_item(plistVal, "Error") != nil {
                     debugLog("[IdeviceGateway] error: UniqueChipID returned error plist")
-                    throw IdeviceGatewayError.serviceError("Failed to get UniqueChipID: Prohibited")
+                    throw IdeviceGatewayError.serviceError("获取 UniqueChipID 失败：被禁止")
                 }
                 var val: UInt64 = 0
                 plist_get_uint_val(plistVal, &val)
@@ -1556,11 +1556,11 @@ internal final class IdeviceGateway {
             debugLog("[IdeviceGateway] error: image_mounter_connect failed")
             providerToFree = nil
             defer { idevice_error_free(mounterConnectErr) }
-            throw IdeviceGatewayError.serviceError("Failed to connect to image mounter")
+            throw IdeviceGatewayError.serviceError("连接到映像挂载器失败")
         }
         guard let mounterClient = mounterClient else {
             debugLog("[IdeviceGateway] error: mounterClient was nil")
-            throw IdeviceGatewayError.serviceError("Mounter client was nil")
+            throw IdeviceGatewayError.serviceError("挂载器客户端为空")
         }
         defer { image_mounter_free(mounterClient) }
 
@@ -1589,7 +1589,7 @@ internal final class IdeviceGateway {
                         let msg = self.getErrorMessage(from: mountErr)
                         debugLog("[IdeviceGateway] mountPersonalizedDdiIdevice() mount failed: code=\(mountErr.pointee.code), message=\(msg)")
                         defer { idevice_error_free(mountErr) }
-                        throw IdeviceGatewayError.serviceError("Failed to mount personalized DDI, error: (\(msg))")
+                        throw IdeviceGatewayError.serviceError("挂载个性化 DDI 失败，错误：(\(msg))")
                     }
                     verboseLog("[IdeviceGateway] mountPersonalizedDdiIdevice() mount succeeded")
                 }
@@ -1695,7 +1695,7 @@ internal final class IdeviceGateway {
                         let msg = self.getErrorMessage(from: uploadErr)
                         debugLog("[IdeviceGateway] mountDeveloperImage() upload failed: \(msg)")
                         defer { idevice_error_free(uploadErr) }
-                        throw IdeviceGatewayError.serviceError("Failed to upload developer image, error: (\(msg))")
+                        throw IdeviceGatewayError.serviceError("上传开发者映像失败，错误：(\(msg))")
                     }
                     debugLog("[IdeviceGateway] mountDeveloperImage() upload succeeded")
                 }
@@ -1717,7 +1717,7 @@ internal final class IdeviceGateway {
                     let msg = self.getErrorMessage(from: mountErr)
                     debugLog("[IdeviceGateway] mountDeveloperImage() mount failed: code=\(mountErr.pointee.code), message=\(msg)")
                     defer { idevice_error_free(mountErr) }
-                    throw IdeviceGatewayError.serviceError("Failed to mount developer image, error: (\(msg))")
+                    throw IdeviceGatewayError.serviceError("挂载开发者映像失败，错误：(\(msg))")
                 }
                 debugLog("[IdeviceGateway] mountDeveloperImage() mount succeeded")
             }
@@ -1747,7 +1747,7 @@ internal final class IdeviceGateway {
         if let genErr = genErr {
             debugLog("[IdeviceGateway] startWirelessPair() rp_pairing_file_generate failed")
             defer { idevice_error_free(genErr) }
-            throw IdeviceGatewayError.serviceError("Failed to generate pairing file")
+            throw IdeviceGatewayError.serviceError("生成配对文件失败")
         }
         defer { rp_pairing_file_free(rpf) }
 
@@ -1759,7 +1759,7 @@ internal final class IdeviceGateway {
         if let toBytesErr = toBytesErr {
             debugLog("[IdeviceGateway] startWirelessPair() rp_pairing_file_to_bytes failed")
             defer { idevice_error_free(toBytesErr) }
-            throw IdeviceGatewayError.serviceError("Failed to serialize pairing file to bytes")
+            throw IdeviceGatewayError.serviceError("将配对文件序列化为字节失败")
         }
 
         var identifier = ""
@@ -1774,7 +1774,7 @@ internal final class IdeviceGateway {
 
         if identifier.isEmpty {
             debugLog("[IdeviceGateway] startWirelessPair() failed: parsed identifier is empty")
-            throw IdeviceGatewayError.serviceError("Failed to parse identifier from pairing file")
+            throw IdeviceGatewayError.serviceError("从配对文件解析标识符失败")
         }
 
         // 3. Find a free port
@@ -1857,12 +1857,12 @@ internal final class IdeviceGateway {
         if let acceptErr = acceptErr {
             debugLog("[IdeviceGateway] startWirelessPair() pairable_host_accept failed")
             defer { idevice_error_free(acceptErr) }
-            throw IdeviceGatewayError.serviceError("Pairing failed or cancelled")
+            throw IdeviceGatewayError.serviceError("配对失败或已取消")
         }
 
         guard let pairedRpf = pairedRpf else {
             debugLog("[IdeviceGateway] startWirelessPair() pairedRpf is nil")
-            throw IdeviceGatewayError.serviceError("No pairing file returned")
+            throw IdeviceGatewayError.serviceError("未返回配对文件")
         }
         defer { rp_pairing_file_free(pairedRpf) }
 
@@ -1871,7 +1871,7 @@ internal final class IdeviceGateway {
         if let writeErr = writeErr {
             debugLog("[IdeviceGateway] startWirelessPair() rp_pairing_file_write failed")
             defer { idevice_error_free(writeErr) }
-            throw IdeviceGatewayError.serviceError("Failed to write pairing file to path")
+            throw IdeviceGatewayError.serviceError("将配对文件写入路径失败")
         }
 
         // Get alt_irk and identifier from paired file
@@ -1882,7 +1882,7 @@ internal final class IdeviceGateway {
         if let serializeErr = serializeErr {
             debugLog("[IdeviceGateway] startWirelessPair() rp_pairing_file_to_bytes failed")
             defer { idevice_error_free(serializeErr) }
-            throw IdeviceGatewayError.serviceError("Failed to serialize paired file")
+            throw IdeviceGatewayError.serviceError("序列化已配对文件失败")
         }
 
         var altIrkHex = ""
@@ -1928,14 +1928,14 @@ internal final class IdeviceGateway {
                 let msg = self.getErrorMessage(from: err)
                 debugLog("[IdeviceGateway] startHouseArrestAfc() house_arrest_vend_container failed: \(msg)")
                 defer { safeFreeError(err) }
-                throw IdeviceGatewayError.serviceError("Failed to vend container for \(bundleId), error: (\(msg))")
+                throw IdeviceGatewayError.serviceError("为 \(bundleId) 提供容器失败，错误：(\(msg))")
             }
             debugLog("[IdeviceGateway] startHouseArrestAfc() house_arrest_vend_container succeeded")
         }
         
         guard let resultHandle = afcHandle else {
             debugLog("[IdeviceGateway] startHouseArrestAfc() resulting AFC handle is nil")
-            throw IdeviceGatewayError.serviceError("AFC handle is nil after vend_container")
+            throw IdeviceGatewayError.serviceError("提供容器后 AFC 句柄为空")
         }
         return resultHandle
     }
@@ -1951,7 +1951,7 @@ internal final class IdeviceGateway {
             let msg = self.getErrorMessage(from: err)
             debugLog("[IdeviceGateway] afcListDirectory() afc_list_directory failed for: \(path), error: (\(msg))")
             defer { safeFreeError(err) }
-            throw IdeviceGatewayError.serviceError("Failed to list directory: \(path), error: (\(msg))")
+            throw IdeviceGatewayError.serviceError("列出目录失败：\(path)，错误：(\(msg))")
         }
         var items: [String] = []
         if let entries = entriesRaw {
@@ -1977,7 +1977,7 @@ internal final class IdeviceGateway {
             let msg = self.getErrorMessage(from: openErr)
             debugLog("[IdeviceGateway] afcReadFile() afc_file_open failed for: \(path), error: (\(msg))")
             defer { safeFreeError(openErr) }
-            throw IdeviceGatewayError.serviceError("Failed to open file: \(path), error: (\(msg))")
+            throw IdeviceGatewayError.serviceError("打开文件失败：\(path)，错误：(\(msg))")
         }
         defer {
             verboseLog("[IdeviceGateway] afcReadFile() closing file handle")
@@ -1991,7 +1991,7 @@ internal final class IdeviceGateway {
             let msg = self.getErrorMessage(from: readErr)
             debugLog("[IdeviceGateway] afcReadFile() afc_file_read_entire failed, error: (\(msg))")
             defer { safeFreeError(readErr) }
-            throw IdeviceGatewayError.serviceError("Failed to read file: \(path), error: (\(msg))")
+            throw IdeviceGatewayError.serviceError("读取文件失败：\(path)，错误：(\(msg))")
         }
         
         if let ptr = dataPtr {
@@ -2014,7 +2014,7 @@ internal final class IdeviceGateway {
         if let err = err {
             debugLog("[IdeviceGateway] afcGetFileInfo() afc_get_file_info failed for: \(path)")
             defer { safeFreeError(err) }
-            throw IdeviceGatewayError.serviceError("Failed to get info for path: \(path)")
+            throw IdeviceGatewayError.serviceError("获取路径 \(path) 的信息失败")
         }
         defer {
             var mutableInfo = info

@@ -20,7 +20,6 @@ actor DeviceConnectionManager {
     var vpnIface: TunnelNetInfo?
     var reportedPeerIp: String?
     var derivedPeerIp: String?
-    var derivedPeerSubnetMask: String?
     var isDerivedPeerIpReachable = false
     var overridePeerIp: String?
     var isOverridePeerIpReachable = false
@@ -28,7 +27,7 @@ actor DeviceConnectionManager {
     // remote server params
     var remoteServerIp: String?
     var isRemoteServerIpReachable = false
-
+    
     private init() {}
 
     func bindConnectionConfig(_ binding: ConnectionConfigBinding) async {
@@ -65,7 +64,6 @@ actor DeviceConnectionManager {
                 let lastVpnIface = vpnIface
                 let lastReportedPeer = reportedPeerIp
                 let lastDerivedPeer = derivedPeerIp
-                let lastDerivedPeerMask = derivedPeerSubnetMask
                 let lastOverrideIp = overridePeerIp
                 let lastIsDerivedPeerIpReachable = isDerivedPeerIpReachable
                 let lastIsOverridePeerIpReachable = isOverridePeerIpReachable
@@ -75,8 +73,7 @@ actor DeviceConnectionManager {
                 let (resolvedTunnel, candidatePeer, isDerivedReachable) = resolveLocalVPNTunnel(from: interfacesCache)
                 vpnIface = resolvedTunnel
                 reportedPeerIp = resolvedTunnel?.linkLayerDestinationIP?.v4?.host
-                derivedPeerIp = candidatePeer?.ip
-                derivedPeerSubnetMask = candidatePeer?.mask
+                derivedPeerIp = candidatePeer
                 isDerivedPeerIpReachable = isDerivedReachable
 
                 let rawOverrideIp = connectionConfigCache?.getOverrideTunnelPeerIp()
@@ -84,7 +81,7 @@ actor DeviceConnectionManager {
                 isOverridePeerIpReachable = Minimuxer.shared.testDeviceConnection(ifaddr: overridePeerIp)
             
                 let isOverrideIpUnchanged = lastOverrideIp == overridePeerIp
-                let isDerivedIpUnchanged = lastDerivedPeer == derivedPeerIp && lastDerivedPeerMask == derivedPeerSubnetMask
+                let isDerivedIpUnchanged = lastDerivedPeer == derivedPeerIp
                 let isReportedIpUnchanged = lastReportedPeer == reportedPeerIp
                 if lastConnectionMode == connectionMode &&
                     lastInterfaceCache == interfacesCache &&
@@ -103,7 +100,6 @@ actor DeviceConnectionManager {
                 connectionConfigCache?.setTunnelIfaceIp(vpnIface?.interfaceAddresses.v4.first?.host)
                 connectionConfigCache?.setTunnelIfaceSubnetMask(vpnIface?.interfaceAddresses.v4.first?.mask)
                 connectionConfigCache?.setTunnelPeerIp(derivedPeerIp)
-                connectionConfigCache?.setTunnelPeerSubnetMask(derivedPeerSubnetMask)
                 connectionConfigCache?.setTunnelPeerReachable(isDerivedPeerIpReachable)
                 connectionConfigCache?.setOverrideTunnelPeerReachable(isOverridePeerIpReachable)
                 // clear auto discovered reachability state
@@ -117,7 +113,6 @@ actor DeviceConnectionManager {
                   • probable-vpn mask: \(vpnIface?.interfaceAddresses.v4.first?.mask ?? "nil")
                   • probable-vpn destination gateway IP: \(reportedPeerIp ?? "nil")
                   • probable-vpn derived peer IP: \(derivedPeerIp ?? "nil")
-                  • probable-vpn derived peer mask: \(derivedPeerSubnetMask ?? "nil")
                   • override peer IP: \(overridePeerIp ?? "nil")
                   • override peer reachable: \(isOverridePeerIpReachable)
                 
@@ -141,7 +136,6 @@ actor DeviceConnectionManager {
                 connectionConfigCache?.setTunnelIfaceIp(nil)
                 connectionConfigCache?.setTunnelIfaceSubnetMask(nil)
                 connectionConfigCache?.setTunnelPeerIp(nil)
-                connectionConfigCache?.setTunnelPeerSubnetMask(nil)
                 connectionConfigCache?.setTunnelPeerReachable(false)
                 connectionConfigCache?.setOverrideTunnelPeerReachable(false)
                 reportedPeerIp = nil
@@ -157,12 +151,7 @@ actor DeviceConnectionManager {
         }
     }
 
-    private struct CandidatePeer: Equatable {
-        let ip: String
-        let mask: String?
-    }
-
-    private func resolveLocalVPNTunnel(from interfaces: Set<NetInfo>) -> (tunnel: TunnelNetInfo?, candidatePeer: CandidatePeer?, isReachable: Bool) {
+    private func resolveLocalVPNTunnel(from interfaces: Set<NetInfo>) -> (tunnel: TunnelNetInfo?, candidatePeer: String?, isReachable: Bool) {
         // Device connection strictly operates on IPv4 tunnels only
         let tunnels = interfaces
             .compactMap { $0 as? TunnelNetInfo }
@@ -179,7 +168,7 @@ actor DeviceConnectionManager {
         for tunnel in tunnels {
             let candidates = resolveCandidatePeers(for: tunnel)
             for candidate in candidates {
-                if Minimuxer.shared.testDeviceConnection(ifaddr: candidate.ip) {
+                if Minimuxer.shared.testDeviceConnection(ifaddr: candidate) {
                     return (tunnel, candidate, true)
                 }
             }
@@ -206,26 +195,26 @@ actor DeviceConnectionManager {
         return !isSelf
     }
 
-    private func resolveCandidatePeers(for tunnel: TunnelNetInfo) -> [CandidatePeer] {
-        var candidates: [CandidatePeer] = []
+    private func resolveCandidatePeers(for tunnel: TunnelNetInfo) -> [String] {
+        var candidates: [String] = []
         var seen = Set<String>()
 
-        func addCandidate(_ ip: String?, mask: String?) {
+        func addCandidate(_ ip: String?) {
             guard let ip = ip, isValidCandidatePeer(ip, for: tunnel), !seen.contains(ip) else { return }
             seen.insert(ip)
-            candidates.append(CandidatePeer(ip: ip, mask: mask))
+            candidates.append(ip)
         }
 
         // Priority 1: Destination Gateway from route table
         for route in tunnel.destinationRoutes {
-            addCandidate(route.gatewayIPv4, mask: "255.255.255.255")
+            addCandidate(route.gatewayIPv4)
         }
-        // Priority 2: Target Destination IP from route table (preserves route destination subnet mask)
+        // Priority 2: Target Destination IP from route table
         for route in tunnel.destinationRoutes {
-            addCandidate(route.destinationIPv4, mask: route.destinationIPv4Mask)
+            addCandidate(route.destinationIPv4)
         }
         // Priority 3: Point-to-point link layer destination
-        addCandidate(tunnel.linkLayerDestinationIP?.v4?.host, mask: "255.255.255.255")
+        addCandidate(tunnel.linkLayerDestinationIP?.v4?.host)
 
         return candidates
     }
